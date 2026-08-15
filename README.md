@@ -63,11 +63,24 @@ as 16×16 kanji. The patch:
 | `tools/test_printer.py` | headless render test + full sweep |
 | `tools/test_refactor.py` | equivalence test for the refactor |
 | `tools/verify_patch.py` | applies both patches back and compares |
-| `jangou.tbl` | 8×8 character table |
-| `jangou-kanji.tbl` | 16×16 kanji table (135 codes) |
-| `yaku-callsites.csv` | 62 call sites and their patch offsets |
-| `yaku-names.csv` | 90 enumerated Japanese strings |
-| `string-inventory.csv` | UI text triage list — contains false positives |
+| `tools/extract.py` | regenerates the derived CSVs from the ROM |
+| `jangou.tbl` | 8×8 character table — **source**, hand-verified |
+| `jangou-kanji.tbl` | 16×16 kanji table, 135 codes — **source**, hand-verified |
+| `yaku-callsites.csv` | 62 call sites and their patch offsets — *generated* |
+| `yaku-names.csv` | 90 enumerated Japanese strings — *generated* |
+| `string-inventory.csv` | UI text triage, contains false positives — *generated* |
+
+The three CSVs are checked in because the build needs them, but they are
+reproducible from the ROM plus the two `.tbl` files:
+
+```bash
+python tools/extract.py --check    # verify they still match
+python tools/extract.py            # regenerate
+```
+
+The `.tbl` files are *not* generated. They were derived by rendering every
+glyph and checking the result against the game's own yaku spellings — a step
+that needs a human eye. See [`KANJI-TABLE.md`](KANJI-TABLE.md).
 
 ## Documentation
 
@@ -100,11 +113,6 @@ palette              : 3 for every drawn tile, matching the kanji
 
 ## Known gaps
 
-- **`yaku-callsites.csv`, `yaku-names.csv` and `string-inventory.csv` are
-  generated, but their generators are not in `tools/`.** They were produced
-  during analysis and are checked in because the build needs them. That is a
-  real reproducibility hole: the build cannot be regenerated from source alone.
-  Porting the extractors into `tools/` is the first thing to fix.
 - **Nothing has run on hardware or in an emulator yet.** Every claim here comes
   from static analysis and the 6502 harness. Two things the harness cannot
   reach: a score screen with several yaku at once (it prints one at a time, so
