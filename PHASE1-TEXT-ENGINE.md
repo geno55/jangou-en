@@ -115,7 +115,7 @@ stubs (e.g. bank 05 `$803D` → `$C024`, `$8041` → `$C03C`).
 | `$6A–$6F` | `*` `-` `!` `?` `(` `)` |
 | `$70–$73` | `<` `>` `/` `~` |
 | `$74–$7D` | `1`–`9`, `0` |
-| `$7E–$7F` | `X`, `・` |
+| `$7E–$7F` | `□` (a second, bolder X — drawn but unidentified), `・` |
 | `$80–$AF` | hiragana あ…ん, `、` `。` |
 | `$B0–$DC` | katakana ア…ン |
 | `$E0+` | dakuten, handakuten, small kana |
@@ -169,7 +169,6 @@ each one is fetched by its own hardcoded absolute `LDA`.
 
 Scale of it:
 
-- **882** `LDA #imm / STA $02` sites — characters hardcoded as immediates.
 - **~20** `LDA $xxxx,X / STA $02` sites — the only genuinely table-driven text.
 - **3,557** byte-runs in code banks 02/03/04/05/0F that decode as ≥3 valid
   characters, totalling 12,449 characters — see `string-inventory.csv`.
@@ -178,6 +177,48 @@ Scale of it:
 heuristic across code banks, and opcode bytes frequently fall inside the
 charset range, so the inventory contains real false positives. It is a
 triage list, not a script dump.
+
+### How many hardcoded character sites, really
+
+This document used to lead with **882** `LDA #imm / STA $02` sites, and README
+rounded it to "roughly 880". The count is exactly right and the question is
+wrong. Run it yourself:
+
+```bash
+python tools/extract.py --counts
+```
+
+```
+ 882  `LDA #imm / STA $02` sites in the image
+ 210  in banks $08-$0E, which cannot execute (7 copies of bank $0F)
+ ----
+ 672  in banks that run
+  57  feed JSR $A058 - the han value, not a character
+ 137  load a byte that is not a code in either charset
+ ----
+ 478  could still be a character - an UPPER BOUND, not a count
+```
+
+Three things were wrong with counting the whole population:
+
+1. **210 sites are in banks this very document proves dead.** Banks `$08–$0E`
+   are seven byte-identical copies of the fixed bank (§ *Free space*), so they
+   carry seven copies of bank `$0F`'s 30 sites. 7 × 30 = 210, exactly.
+2. **Zero page `$02` is not a character register.** It also carries the han
+   value into `$A058`. The refactor proved this by accident: bank 04 holds
+   **201** of these sites before it and **148** after, and the 53 that vanished
+   are precisely the 53 collapsed call-site blocks. Scoring code was being
+   counted as text.
+3. **`$02` is general scratch besides.** Bank 03 is full of
+   `LDA #$FF / STA $02 / JSR $8118`, and `$FF` is not a code in either
+   character table — it cannot be a glyph.
+
+478 is still an upper bound and probably a loose one: nothing above proves a
+site *draws* anything, it only removes the ones that provably do not. Trying to
+settle it properly means resolving the call graph two levels deep — most of
+these reach a per-bank local routine, not the `$C000` trampoline table — and
+that work has not been done. The honest statement is **"at most ~480, likely
+fewer"**, not 880.
 
 ### Important qualification (added after the Phase 2 kanji pass)
 

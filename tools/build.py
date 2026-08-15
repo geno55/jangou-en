@@ -16,19 +16,13 @@ patches. Re-running with the same inputs produces byte-identical output.
 See BUILD.md.  Engine details: YAKU-PRINTER.md.
 """
 import sys, os, csv, zlib, hashlib, argparse
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import utf8io          # noqa: F401  - stdout must take Japanese before we print
 
-ROOT       = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC_ROM    = os.path.join(ROOT, "Jangou (Japan).nes")
-SCRIPT_TXT = os.path.join(ROOT, "script", "yaku-en.txt")
-CALLSITES  = os.path.join(ROOT, "yaku-callsites.csv")
-OUT_DIR    = os.path.join(ROOT, "build")
-
-SRC_SHA1 = "e1de1fa7a7bbac0315f604beac74a6e296b89078"
-HDR      = 16
-BANK04   = 0x10000
-def cpu2file(a):
-    assert 0x8000 <= a <= 0xBFFF, hex(a)
-    return HDR + BANK04 + (a - 0x8000)
+import rom as cart          # the cartridge map, shared - see tools/rom.py
+from rom import (ROOT, SRC_ROM, SCRIPT_TXT, CALLSITES, CHARSET, SRC_SHA1,
+                 HDR, cpu2file)
+OUT_DIR = cart.BUILD_DIR
 
 # ---------------------------------------------------------------- config ----
 SPACE_CODE = 0x01   # no glyph; the patched printer advances the cursor instead
@@ -48,14 +42,53 @@ POOL_BASE = [(0x9E18, 0x9F13), (0x9F65, 0x9F79)]        # 252 + 21 = 273
 POOL_DORA = (0x9F14, 0x9F64)                            # +81
 
 # ------------------------------------------------------------- charset ------
-def _mk_encoder():
-    m = {c: 0x50 + i for i, c in enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ")}
-    m.update({c: 0x74 + i for i, c in enumerate("123456789")})
-    m["0"] = 0x7D
-    m.update({" ": SPACE_CODE, "*": 0x6A, "-": 0x6B, "!": 0x6C, "?": 0x6D,
-              "(": 0x6E, ")": 0x6F, "<": 0x70, ">": 0x71, "/": 0x72, ".": 0x7F})
-    return m
-ENC = _mk_encoder()
+# jangou.tbl is the character set. This file used to carry a second, hand
+# written copy of it, and the two drifted with nothing to catch it: the copy
+# here mapped "." to $7F, while the table says $7F is "・", a centred dot. A
+# period in the script drew an interpunct, and the error message below
+# advertised a character the font does not have. Read the table instead.
+def load_charset(path=CHARSET):
+    """character -> code, from jangou.tbl.
+
+    Both directions must be one-to-one. A character listed twice is a table
+    bug worth stopping for: $67 and $7E were both "X" with different bitmaps,
+    so "X" silently meant whichever line was read last."""
+    enc, at = {}, {}
+    with open(path, encoding="utf-8") as f:
+        for lineno, raw in enumerate(f, 1):
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            code_s, sep, ch = line.partition("=")
+            if not sep or len(ch) != 1:
+                raise SystemExit("%s:%d: expected 'HH=<one character>', got %r"
+                                 % (path, lineno, line))
+            try:
+                code = int(code_s, 16)
+            except ValueError:
+                raise SystemExit("%s:%d: %r is not a hex code" % (path, lineno, code_s))
+            if ch in enc:
+                raise SystemExit("%s:%d: %r is already $%02X - one character, one code"
+                                 % (path, lineno, ch, enc[ch]))
+            if code in at:
+                raise SystemExit("%s:%d: $%02X is already %r - one code, one character"
+                                 % (path, lineno, code, at[code]))
+            enc[ch], at[code] = code, ch
+    if not enc:
+        raise SystemExit("%s: no character mappings found" % path)
+    # Space is an engine convention, not a font code. The 8x8 page has no blank
+    # tile, so the patched printer compares against SPACE_CODE and advances the
+    # cursor without drawing. It is deliberately outside the table's range.
+    if SPACE_CODE in at:
+        raise SystemExit("%s: $%02X is the printer's space code but the table "
+                         "gives it to %r" % (path, SPACE_CODE, at[SPACE_CODE]))
+    enc[" "] = SPACE_CODE
+    return enc
+ENC = load_charset()
+
+def usable_chars():
+    """The printable ASCII the script can use, straight from ENC."""
+    return " ".join(sorted(c for c in ENC if c.isascii() and not c.isspace()))
 
 def encode(text, where):
     out = bytearray()
@@ -63,9 +96,11 @@ def encode(text, where):
         if ch not in ENC:
             raise SystemExit(
                 "%s: character %r is not in the game's 8x8 font.\n"
-                "  Usable: A-Z 0-9 space * - ! ? ( ) < > / .\n"
-                "  The font has no lowercase, comma, colon or apostrophe."
-                % (where, ch))
+                "  Usable: %s\n"
+                "  ...plus space, and the kana and marks listed in jangou.tbl.\n"
+                "  No lowercase, comma, colon, apostrophe or period - the font\n"
+                "  has none of them. ($7F looks like a period but is '・'.)"
+                % (where, ch, usable_chars()))
         out.append(ENC[ch])
     out.append(0x00)
     return bytes(out)
@@ -96,7 +131,15 @@ assert len(PRINTER_OLD) == len(PRINTER_NEW) == 29
 
 # ------------------------------------------------------------- inputs -------
 def load_script():
-    rows = []
+    """Parse script/yaku-en.txt. Every problem is a SystemExit naming the line.
+
+    The index used to go straight into a dict, so two lines carrying the same
+    index kept the last one silently: no warning, exit 0, the wrong name burned
+    into the ROM. The file's own header says "Do not renumber" and nothing
+    enforced it - including tools/test_printer.py, which builds its expected
+    strings from this very function and would have cheerfully confirmed the
+    broken build."""
+    rows, seen = [], {}
     with open(SCRIPT_TXT, encoding="utf-8") as f:
         for lineno, raw in enumerate(f, 1):
             line = raw.split("#", 1)[0].strip()
@@ -104,11 +147,30 @@ def load_script():
                 continue
             parts = [p.strip() for p in line.split("|")]
             if len(parts) != 3:
-                raise SystemExit("%s:%d: expected 'index | japanese | english'"
-                                 % (SCRIPT_TXT, lineno))
+                raise SystemExit("%s:%d: expected 'index | japanese | english', "
+                                 "found %d field%s"
+                                 % (SCRIPT_TXT, lineno, len(parts),
+                                    "" if len(parts) == 1 else "s"))
             idx, jp, en = parts
-            rows.append({"line": lineno, "idx": int(idx.lstrip("*")),
-                         "jp": jp, "en": en.upper(), "prio": idx.startswith("*")})
+            try:
+                n = int(idx.lstrip("*"))
+            except ValueError:
+                raise SystemExit("%s:%d: %r is not an index - expected a number, "
+                                 "optionally prefixed with * for priority"
+                                 % (SCRIPT_TXT, lineno, idx))
+            if n in seen:
+                raise SystemExit(
+                    "%s:%d: index %d is already used on line %d (%r).\n"
+                    "  Two lines cannot share an index. The second would replace "
+                    "the first with no warning and the wrong name would reach the "
+                    "ROM, which is why this is an error and not a note."
+                    % (SCRIPT_TXT, lineno, n, seen[n]["line"], seen[n]["en"]))
+            row = {"line": lineno, "idx": n, "jp": jp,
+                   "en": en.upper(), "prio": idx.startswith("*")}
+            seen[n] = row
+            rows.append(row)
+    if not rows:
+        raise SystemExit("%s: no translation lines found" % SCRIPT_TXT)
     return rows
 
 def load_callsites():
@@ -117,6 +179,7 @@ def load_callsites():
         for i, r in enumerate(csv.DictReader(f)):
             out[i] = {"lo": int(r["patch_lo_prg_off"].lstrip("$"), 16),
                       "hi": int(r["patch_hi_prg_off"].lstrip("$"), 16),
+                      "ptr": int(r["pointer_cpu"].lstrip("$"), 16),
                       "jp": r["japanese"],
                       "jp_bytes": bytes.fromhex(r["bytes"].replace(" ", "")) + b"\x00"}
     return out
@@ -245,6 +308,12 @@ def main():
 
     # The refactor rewrites $8F51-$9B1D, so it must happen before anything is
     # placed. It returns the freed span, which joins the string pool.
+    # Parse the hand-edited inputs before doing any work on the image, so a
+    # typo in the script fails on line 1 rather than after a page of refactor
+    # output that is about to be thrown away.
+    sites = load_callsites()
+    rows  = load_script()
+
     dst = bytearray(src)
     regions = list(POOL_BASE) + ([POOL_DORA] if args.use_dora_block else [])
     ptr_tables = None
@@ -256,8 +325,14 @@ def main():
     pool = coalesce(regions)
     pool_total = sum(hi - lo + 1 for lo, hi in pool)
 
-    sites = load_callsites()
-    rows  = load_script()
+    # Which loop slot each call site's pointer belongs in - verified against
+    # the unpatched ROM, not assumed from row order. See refactor.py.
+    ptr_slots = None
+    if ptr_tables is not None:
+        ptr_slots = refactor.check_callsite_map(src, sites)
+        print("  call site -> slot map verified: %d rows, slots 0-%d, every "
+              "pointer matches its block" % (len(ptr_slots), len(ptr_slots) - 1))
+
     english = {}
     for r in rows:
         if r["idx"] not in sites:
@@ -314,13 +389,13 @@ def main():
         dst[o:o + len(s)] = s
     for i, s in chosen.items():
         a = resolve(s, addr)
-        # After the refactor, blocks 2..54 no longer carry their pointer as an
-        # immediate - it lives in the tbl_lo/tbl_hi arrays. csv index == block
-        # index for 0..55, so slot = i - 2.
-        if ptr_tables is not None and 2 <= i <= 54:
+        # After the refactor the collapsed blocks no longer carry their pointer
+        # as an immediate - it lives in the tbl_lo/tbl_hi arrays, at the slot
+        # check_callsite_map() derived and verified for this row.
+        if ptr_slots is not None and i in ptr_slots:
             t_lo, t_hi = ptr_tables
-            dst[cpu2file(t_lo + i - 2)] = a & 0xFF
-            dst[cpu2file(t_hi + i - 2)] = (a >> 8) & 0xFF
+            dst[cpu2file(t_lo + ptr_slots[i])] = a & 0xFF
+            dst[cpu2file(t_hi + ptr_slots[i])] = (a >> 8) & 0xFF
         else:
             dst[HDR + sites[i]["lo"]] = a & 0xFF
             dst[HDR + sites[i]["hi"]] = (a >> 8) & 0xFF
@@ -342,6 +417,19 @@ def main():
     print("\nin English (%d):" % len(upgraded))
     for i in sorted(upgraded):
         print("    %-16s %s" % (sites[i]["jp"], english[i]["text"]))
+    # A call site with no line in the script prints nothing, and until this was
+    # added the build said so nowhere: delete a line by accident and the name
+    # just vanished from the game with exit 0. "Did not fit" and "was never
+    # written" are different problems and are reported separately.
+    no_line = sorted(set(sites) - set(english))
+    if no_line:
+        print("\nNO SCRIPT LINE (%d): %s"
+              % (len(no_line), ", ".join(sites[i]["jp"] for i in no_line)))
+        print("  These indices have no entry in script/yaku-en.txt, so they print")
+        print("  nothing. If that is deliberate, fine. If a line was deleted by")
+        print("  accident, this is where it shows - tools/test_printer.py treats")
+        print("  it as a failure.")
+
     left = [i for i in english if i not in upgraded]
     if left:
         print("\nBLANK - no room for English (%d): %s"

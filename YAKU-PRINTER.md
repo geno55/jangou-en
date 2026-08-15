@@ -73,7 +73,7 @@ $9F9E   LDA ($0D),Y             ; fetch character
 $9FA0   BEQ done                ; $00 terminates
 $9FA2   STA $02
 $9FA4   JSR $80CA               ; -> $C027  upload 16x16 kanji (4 tiles)
-$9FA7   JSR $80DA               ; -> $C039  draw 2x2 + set attribute
+$9FA7   JSR $80DA               ; -> $C03F  draw 2x2 + set attribute
 $9FAA   INC $0C  x4             ; slot base += 4
 $9FB2   INC $00  x2             ; column += 2
 $9FB6   INC $05
@@ -115,31 +115,66 @@ pairs**. No new printer, no engine to write.
 ### The core patch
 
 Switch `$9F7A` from 16×16 kanji to 8×8 characters. Bank 04's local stubs make
-this a same-length edit:
+this a same-length edit.
 
-| CPU | PRG off | File off | Before | After | Effect |
-|---|---|---|---|---|---|
-| `$9FA4` | `$11FA4` | `$11FB4` | `20 CA 80` | `20 C6 80` | `$C027` → `$C024`, 8×8 glyph |
-| `$9FA7` | `$11FA7` | `$11FB7` | `20 DA 80` | `20 D6 80` | `$C039` → `$C03C`, single tile |
-| `$9FAC` | `$11FAC` | `$11FBC` | `E6 0C E6 0C E6 0C` | `EA` × 6 | slot base += 1, not 4 |
-| `$9FB4` | `$11FB4` | `$11FC4` | `E6 00` | `EA EA` | column += 1, not 2 |
-| `$9F91` | `$11F91` | `$11FA1` | `0A` | narrower | starting column |
-| `$9FBB` | `$11FBB` | `$11FCB` | `E6 0B E6 0B` | `E6 0B EA EA` | line pitch 1 row, not 2 |
+**What shipped** is one 29-byte replacement at `$9F9E` (PRG `$11F9E`, file
+`$11FAE` — file offsets include the 16-byte iNES header, and bank 04 begins at
+PRG `$10000`). `build.py` asserts old and new are both exactly 29 bytes and
+refuses to run if the bytes it finds are not the ones below:
 
-(File offsets include the 16-byte iNES header. Bank 04 begins at PRG `$10000`.)
+```
+before  b1 0d f0 19 85 02  20 ca 80  20 da 80  e6 0c e6 0c e6 0c e6 0c
+        e6 00 e6 00  e6 05  4c 98 9f
+after   b1 0d f0 19 85 02  c9 01 f0 06  20 c6 80  20 d6 80  e6 0c
+        e6 00  e6 05  4c 98 9f  ea ea ea ea
+```
 
-Every change is same-length or NOP-padded, so **no address moves** and nothing
+| effect | how |
+|---|---|
+| upload one 8×8 glyph, not four | `JSR $80CA` → `JSR $80C6`, i.e. `$C027` → `$C024` |
+| write one tile, not a 2×2 block | `JSR $80DA` → `JSR $80D6`, i.e. `$C03F` → `$C03C` |
+| CHR-RAM slot += 1, not 4 | three of the four `INC $0C` removed |
+| column += 1, not 2 | one of the two `INC $00` removed |
+| space draws nothing | **new:** `CMP #$01 / BEQ` skips both `JSR`s |
+| keep `$9FBB` where it was | four trailing `NOP`s |
+
+The freed bytes paid for the space check, which the first draft of this section
+did not have. The net edit changes bytes only in `$9FA4–$9FAD`, `$9FB1` and
+`$9FB3–$9FBA`; `$9FBB` onward is untouched, so **no address moves** and nothing
 downstream needs fixing up. The cost is a handful of wasted cycles per
-character, which is irrelevant on a static score screen.
+character, irrelevant on a static score screen.
 
-### One thing this breaks, deliberately
+**Two edits proposed here were dropped and are not in the patch.** They are
+recorded because the reasoning is still useful, not because they happened:
 
-`$C03C` writes a nametable tile but **not** an attribute byte — the attribute
-write lives in `$C039`, which we are dropping. English yaku text will inherit
-whatever palette the score window's attribute bytes already hold. That is
-probably fine, but verify it on screen; if the text comes out the wrong colour,
-set the window's attributes once when the window is drawn rather than
-reintroducing a per-character attribute write.
+- `$9F91`, the starting column, was going to be narrowed. It stayed at `$0A`.
+  The original draws 7 kanji × 2 = 14 columns from column 10, so 14 8×8
+  characters start at the same place and end no further right. There was
+  nothing to buy.
+- `$9FBB`, the line pitch, was going to drop from 2 rows to 1. It stayed at 2.
+  Keeping it means the yaku list occupies exactly the rows it always did, so
+  nothing positioned relative to it has to be re-checked. The cost is a blank
+  row between names.
+
+### One thing this does *not* break — an earlier claim, retracted
+
+This section used to state that the patch drops the per-character attribute
+write, because `$C03C` writes a nametable tile and the attribute write lives in
+`$C039`, which the patch stops calling. **That was wrong, and the error was
+in the call number.** The original printer calls `$80DA` → `$C03F`, not
+`$C039`; the patched one calls `$80D6` → `$C03C` → `$E616`, which sets `$02`
+to 3 and falls into `$D939`, which writes the tile to `$2007` and then hits
+`JSR $D742` at `$D96A` — the same attribute writer the original reaches by the
+longer route `$C03F` → `$E6AE` → `$D9DE` → `$DA3E`.
+
+So the attribute write survives, and the palette is not inherited from whatever
+the score window happened to hold. `tools/test_printer.py` checks it on every
+drawn tile: palette 3, on both the original and the patched render. Six
+attribute writes instead of two, because two 8×8 characters share an attribute
+quadrant and `$D742` read-modify-writes each one.
+
+The advice that followed from the wrong claim — set the window's attributes
+once when it is drawn — is not needed and is not in the patch.
 
 ### Then the strings
 
@@ -160,13 +195,33 @@ Start with option 2. Measure the score window's width before writing a single
 English name — it sets the character budget, and it is cheaper to discover the
 limit now than after 80 translations.
 
-## 4. Corrections to earlier documents
+**Outcome:** option 2, and the budget turned out to be the binding constraint.
+The Japanese table is 354 bytes and the English script wants 484, so option 2
+on its own reaches 47 of 62 names. Collapsing the 53 unrolled call-site blocks
+into a loop (`tools/refactor.py`) frees 2621 more and finishes all 62. The
+character budget is 14, the width the original already draws. See `BUILD.md`.
+
+## 4. Corrections
+
+### To earlier documents
 
 Both amended in place:
 
 - `PHASE1-TEXT-ENGINE.md` — `$EB19` was called a probable name-length table.
   It is a palette table.
 - `KANJI-TABLE.md` — same correction; the walker item is now resolved.
+
+### To this document
+
+- §3 said the patch drops the per-character attribute write. It does not; the
+  claim named `$C039`, a stub the printer never called. Corrected above, and
+  the wrong version is gone rather than left standing next to its retraction —
+  a correction printed beside the error still leaves the error there to be
+  copied.
+- §3's table of six byte edits was a proposal, not the patch. Two of its rows
+  (`$9F91` starting column, `$9FBB` line pitch) were never applied, and the
+  shipped code gained a space check the table did not have. Replaced with the
+  bytes `build.py` actually writes, with the dropped rows marked as dropped.
 
 The Phase 1 claim that "there is no script and no string printer" also needs
 its final shape: it is true of **menu and UI text**, which really is unrolled
@@ -175,14 +230,24 @@ and a printer. The two subsystems need completely different treatment.
 
 ## 5. Next
 
-1. **Runtime CDL pass** in Mesen — still outstanding, still the thing that
-   validates all of this against a running game and separates real UI strings
-   from false positives in `string-inventory.csv`.
-2. **Find the ドラ pointer computation** so the 18 dora entries survive
-   repointing.
-3. **Measure the score window** and draft English yaku names to fit.
-4. **Apply the `$9F7A` patch** and confirm one yaku renders in Latin. That is
-   the proof-of-concept that de-risks the whole project.
+Done since this document was written:
+
+- ~~Measure the score window and draft English names to fit.~~ 14 characters,
+  all 62 written — `script/yaku-en.txt`.
+- ~~Apply the `$9F7A` patch and confirm one yaku renders in Latin.~~ Applied;
+  all 62 verified glyph by glyph in `tools/test_printer.py`, against the ROM's
+  own font rather than by eye.
+
+Still outstanding:
+
+1. **Runtime CDL pass** in Mesen — still the thing that validates all of this
+   against a running game and separates real UI strings from false positives in
+   `string-inventory.csv`. **Nothing here has run on hardware or in an
+   emulator.**
+2. **Find the ドラ pointer computation.** Unresolved. `--use-dora-block` reuses
+   those 81 bytes on the strength of *no reference found*, which is weaker than
+   *no reference exists* — and with `--refactor` the flag buys nothing, so
+   there is no longer a reason to take the risk.
 
 ## Files
 

@@ -3,6 +3,17 @@
 # charset occupies font tiles $250-$2EF = codes $50-$EF.
 # Verified against: bank 05 $9ED2 "<やくまん>", bank 05 $ABB1 "<こしんきろく>"
 #
+# THIS FILE IS THE ONLY CHARACTER SET. tools/build.py reads it to build its
+# encoder - there is no second copy in the Python. There used to be, and the
+# two drifted: build.py mapped "." to $7F while this file (correctly) calls
+# $7F a centred dot, so a period in the script drew "・". If you change a
+# line here you change what the build accepts. Format: HH=<one character>,
+# '#' starts a comment line.
+#
+# $5E "O" and $7D "0" are byte-identical in the font. That is the ROM's doing,
+# not a mistake here, and it means rendered text cannot be read back
+# unambiguously. tools/test_printer.py reports the pair and carries on.
+#
 # Dakuten/handakuten are NOT encoded in these codes - they are separate
 # combining glyphs living in the $E0 row of the font sheet.
 #
@@ -55,7 +66,14 @@
 7B=8
 7C=9
 7D=0
-7E=X
+# $7E was "X", which is wrong: it is a DIFFERENT bitmap from $67 - a bolder X
+# with a filled centre. Two codes sharing one character meant "X" silently
+# encoded to whichever line was read last. Its meaning is not established (a
+# multiplication sign is the obvious guess, and a guess does not belong in a
+# file called hand-verified source), so it takes □, this project's mark for a
+# glyph that exists but has not been identified - as in jangou-kanji.tbl.
+# Strings containing it still decode; nothing claims to know what it says.
+7E=□
 7F=・
 80=あ
 81=い

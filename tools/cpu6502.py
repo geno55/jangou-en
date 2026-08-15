@@ -1,10 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""A small, complete NMOS 6502 interpreter (documented opcodes only).
+"""A small 6502 interpreter: all 151 documented opcodes, none of the 105
+undocumented ones.
+
+"Complete NMOS 6502" is the wrong way to say this and both docs used to say it:
+NMOS is precisely the variant where the undocumented opcodes exist, so the
+phrase claims the one thing that is not true.
 
 Enough to execute real NES code against a Bus object exposing read(a)/write(a,v).
-No decimal mode: the 2A03 does not have it. Cycles are approximate - this is
-for behaviour, not timing.
+No decimal mode: the 2A03 does not have it.
+
+No cycle counting either. There was a `cycles` field that added a flat 4 per
+instruction and was never read by anything; a number named after a quantity it
+does not measure is worse than no number, so it is gone. This models behaviour,
+not timing.
+
+An opcode outside the documented set raises IllegalOpcode rather than being
+treated as a NOP, so undocumented use shows up instead of quietly working.
 """
 
 IMP, ACC, IMM, ZP, ZPX, ZPY, ABS, ABX, ABY, IND, IZX, IZY, REL = range(13)
@@ -46,6 +58,15 @@ FE INC ABX
 """)
 
 
+# The docstring and README quote these. Keep them from drifting apart.
+DOCUMENTED_OPCODES  = 151
+DOCUMENTED_MNEMONICS = 56
+assert len(OPS) == DOCUMENTED_OPCODES, \
+    "opcode table has %d entries, not %d" % (len(OPS), DOCUMENTED_OPCODES)
+assert len({mn for mn, _ in OPS.values()}) == DOCUMENTED_MNEMONICS, \
+    "mnemonic count changed - update the docstring and README"
+
+
 class IllegalOpcode(Exception):
     pass
 
@@ -57,7 +78,6 @@ class CPU:
         self.s = 0xFD
         self.pc = 0
         self.c = self.z = self.i = self.d = self.v = self.n = False
-        self.cycles = 0
 
     # ---- flag helpers ----
     def _nz(self, v):
@@ -143,7 +163,6 @@ class CPU:
         mn, am = ent
         self.pc = (self.pc + 1) & 0xFFFF
         ea = self._operand(am)
-        self.cycles += 4
         b = self.bus
 
         # loads / stores

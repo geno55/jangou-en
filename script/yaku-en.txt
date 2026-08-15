@@ -4,18 +4,22 @@
 #
 #   index     row in yaku-callsites.csv (0-61). Do not renumber.
 #   japanese  reference only, for the translator. Ignored by the build.
-#   english   what gets encoded. Uppercase A-Z, 0-9, space, and * - ! ? ( ) < > / .
-#             The font has NO lowercase, comma, colon or apostrophe.
+#   english   what gets encoded. Uppercase A-Z, 0-9, space, and * - ! ? ( ) < > / ~
+#             NO lowercase, comma, colon, apostrophe or PERIOD - the font has
+#             none of them. ($7F looks like a period; it is the centred dot ・.)
+#             The character set is jangou.tbl. build.py reads that file and
+#             prints the usable set when it rejects something.
 #   *         high priority - packed first when space runs out.
 #
 # Hard limit 14 characters: the width the original already draws
 # (国士無双十三面 = 7 kanji x 2 columns), so it is known safe.
 #
-# SPACE IS TIGHT. There are 354 bytes for all 62 names (see BUILD.md). Anything
-# that does not fit is left BLANK, not Japanese - the patched printer is 8x8
-# only, so a kanji code would draw garbage. Every character you save here buys
-# another name. Names are standard romaji; "-C" marks the 門前 (concealed)
-# variant, which scores differently.
+# SPACE: with --refactor the pool is 2975 bytes, all 62 names fit, and length
+# is no longer the binding constraint - the 14-character limit is. Without it
+# there are only 354 bytes, and anything that does not fit is left BLANK, not
+# Japanese: the patched printer is 8x8 only, so a kanji code would draw
+# garbage. Names are standard romaji; "-C" marks the 門前 (concealed) variant,
+# which scores differently.
 
 # --- common in play -------------------------------------------------------
 *1  | 立直           | RIICHI

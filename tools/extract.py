@@ -21,14 +21,17 @@ needs a human eye, so the tables are checked in as source. Everything below is
 mechanical and reproducible.
 """
 import sys, os, csv, io, hashlib, argparse
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import utf8io          # noqa: F401  - --check echoes CSV lines full of kanji
 
-ROOT     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC_ROM  = os.path.join(ROOT, "Jangou (Japan).nes")
-SRC_SHA1 = "e1de1fa7a7bbac0315f604beac74a6e296b89078"
-HDR      = 16
+from rom import ROOT, SRC_ROM, SRC_SHA1, HDR, BANK_SIZE, window
 
-BANK = lambda prg, n: prg[n * 0x4000:(n + 1) * 0x4000]
-ORG  = lambda n: 0x8000 if n < 8 else 0xC000
+BANK = lambda prg, n: prg[n * BANK_SIZE:(n + 1) * BANK_SIZE]
+# Where a bank is seen by the 6502. This used to be `0x8000 if n < 8 else
+# 0xC000`, which put banks $08-$0E at $C000; the mapper puts every bank except
+# $0F at $8000. No inventory row happened to land in $08-$0E, so the two
+# copies of the cartridge map disagreed without ever producing a wrong byte.
+ORG  = window
 
 # Bank 04 / 05 string tables. The bank 05 start is found by scanning, below.
 YAKU_TABLE   = (4, 0x9E18, "scoring")
@@ -82,7 +85,7 @@ def enum_table(prg, bank, start_cpu, dec_ok, maxn=140):
         s = blk[off:end]
         if not s or any(b > MAX_KANJI for b in s):
             break
-        out.append((ORG(bank) + off, bank * 0x4000 + off, bytes(s)))
+        out.append((ORG(bank) + off, bank * BANK_SIZE + off, bytes(s)))
         off = end + 1
     return out
 
@@ -103,8 +106,8 @@ def gen_callsites(prg, kdec):
                     end += 1
                 s = blk[so:end]
                 rows.append(["%02X" % b, "$%04X" % (ORG(b) + i),
-                             "$%05X" % (b * 0x4000 + i + 1),
-                             "$%05X" % (b * 0x4000 + i + 5),
+                             "$%05X" % (b * BANK_SIZE + i + 1),
+                             "$%05X" % (b * BANK_SIZE + i + 5),
                              "$%04X" % ptr, len(s), kdec(s), s.hex(" ")])
     return ["bank", "callsite_cpu", "patch_lo_prg_off", "patch_hi_prg_off",
             "pointer_cpu", "length", "japanese", "bytes"], rows
@@ -137,10 +140,74 @@ def gen_inventory(prg, tbl, ldec):
             else:
                 if len(run) >= 3:
                     rows.append(["%02X" % b, "$%04X" % (ORG(b) + start),
-                                 "$%05X" % (b * 0x4000 + start), len(run),
+                                 "$%05X" % (b * BANK_SIZE + start), len(run),
                                  ldec(bytes(run)), bytes(run).hex(" ")])
                 run = []
     return ["bank", "cpu_addr", "prg_offset", "length", "decoded", "bytes"], rows
+
+
+# --------------------------------------------------- the UI text estimate --
+# PHASE1 quoted 882 `LDA #imm / STA $02` sites and README rounded it to
+# "roughly 880". The count is right and the question is wrong, three times over:
+#
+#   * 210 of them are in banks $08-$0E, which PHASE1's own analysis proves
+#     cannot execute - they are seven byte-identical copies of the fixed bank,
+#     carrying seven copies of its 30 sites.
+#   * zero page $02 is not a character register. It carries the han value into
+#     $A058 as well, so the pattern counts scoring code as text. The refactor
+#     proved it: bank 04 has 201 of these before and 148 after, and the 53
+#     that vanished are exactly the 53 collapsed blocks.
+#   * $02 is general scratch besides. Bank 03 is full of `LDA #$FF / STA $02`,
+#     and $FF is not a code in either character table.
+#
+# What is left is an upper bound, not a count. Nothing here proves a site
+# draws anything; it only removes the ones that provably do not.
+DEAD_BANKS = tuple(range(0x08, 0x0F))    # duplicate builds of the fixed bank
+LIVE_BANKS = (2, 3, 4, 5, 6, 7, 0x0F)    # 00/01 are font data and hold none
+HAN_CALL   = b"\x20\x58\xa0"             # JSR $A058, the han-value display
+
+
+def count_ui_sites(rom, valid_codes):
+    """Breakdown of the `LDA #imm / STA $02` population. Returns a dict."""
+    prg_ = rom if len(rom) < 0x40000 + HDR else rom[HDR:]
+    def sites(bank):
+        b = BANK(prg_, bank)
+        return [(i, b[i + 1], b) for i in range(len(b) - 3)
+                if b[i] == 0xA9 and b[i + 2] == 0x85 and b[i + 3] == 0x02]
+
+    total = sum(len(sites(k)) for k in range(16))
+    dead  = sum(len(sites(k)) for k in DEAD_BANKS)
+    han = not_a_code = maybe = 0
+    for k in LIVE_BANKS:
+        for i, imm, b in sites(k):
+            if HAN_CALL in bytes(b[i + 4:i + 28]):
+                han += 1
+            elif imm not in valid_codes:
+                not_a_code += 1
+            else:
+                maybe += 1
+    return {"total": total, "dead": dead, "live": total - dead,
+            "han": han, "not_a_code": not_a_code, "maybe": maybe}
+
+
+def report_counts(rom, tbl, kan):
+    c = count_ui_sites(rom, set(tbl) | set(kan))
+    print("UI text: how many hardcoded character sites are really there")
+    print("  %4d  `LDA #imm / STA $02` sites in the image" % c["total"])
+    print("  %4d  in banks $08-$0E, which cannot execute (7 copies of bank $0F)"
+          % c["dead"])
+    print("  ----")
+    print("  %4d  in banks that run" % c["live"])
+    print("  %4d  feed JSR $A058 - the han value, not a character" % c["han"])
+    print("  %4d  load a byte that is not a code in either charset" % c["not_a_code"])
+    print("  ----")
+    print("  %4d  could still be a character - an UPPER BOUND, not a count"
+          % c["maybe"])
+    print()
+    print("  Nothing here proves a site draws anything. It removes only the")
+    print("  ones that provably do not, and 'roughly 880' was the population")
+    print("  before any of that was subtracted.")
+    return c
 
 
 def render(header, rows):
@@ -155,6 +222,8 @@ def render(header, rows):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--counts", action="store_true",
+                    help="report the UI text site breakdown and exit")
     ap.add_argument("--check", action="store_true",
                     help="verify the committed files match; exit 1 if not")
     args = ap.parse_args()
@@ -165,6 +234,11 @@ def main():
     kdec = lambda bs: "".join(kan.get(b, "‹%02X›" % b) for b in bs)
     ldec = lambda bs: "".join(tbl.get(b, "・") for b in bs)
     print("ROM ok, %d 8x8 codes, %d kanji codes" % (len(tbl), len(kan)))
+
+    if args.counts:
+        print()
+        report_counts(open(SRC_ROM, "rb").read(), tbl, kan)
+        return 0
 
     outputs = {
         "yaku-callsites.csv":   gen_callsites(prg, kdec),
