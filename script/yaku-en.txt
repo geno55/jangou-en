@@ -1,0 +1,88 @@
+# Jangou - English yaku names
+#
+# Format:   [*]index | japanese | english
+#
+#   index     row in yaku-callsites.csv (0-61). Do not renumber.
+#   japanese  reference only, for the translator. Ignored by the build.
+#   english   what gets encoded. Uppercase A-Z, 0-9, space, and * - ! ? ( ) < > / .
+#             The font has NO lowercase, comma, colon or apostrophe.
+#   *         high priority - packed first when space runs out.
+#
+# Hard limit 14 characters: the width the original already draws
+# (国士無双十三面 = 7 kanji x 2 columns), so it is known safe.
+#
+# SPACE IS TIGHT. There are 354 bytes for all 62 names (see BUILD.md). Anything
+# that does not fit is left BLANK, not Japanese - the patched printer is 8x8
+# only, so a kanji code would draw garbage. Every character you save here buys
+# another name. Names are standard romaji; "-C" marks the 門前 (concealed)
+# variant, which scores differently.
+
+# --- common in play -------------------------------------------------------
+*1  | 立直           | RIICHI
+*2  | 立直一発       | IPPATSU
+*3  | 門前清摸和     | TSUMO
+*4  | 断么九         | TANYAO
+*5  | 平和           | PINFU
+*6  | 一盃口         | IIPEIKO
+*0  | ダブル立直     | W-RIICHI
+*11 | 白             | HAKU
+*12 | 發             | HATSU
+*13 | 中             | CHUN
+*14 | 場風           | ROUND
+*15 | 自風           | SEAT
+*16 | 全帯么         | CHANTA
+*17 | 全帯么門前     | CHANTA-C
+*18 | 三色同順       | SANSHOKU
+*19 | 三色同順門前   | SANSHOKU-C
+*22 | 一気通貫       | ITTSU
+*23 | 一気通貫門前   | ITTSU-C
+*29 | 対々和         | TOITOI
+*30 | 七対子         | CHIITOI
+*31 | 混一色         | HONITSU
+*32 | 混一色門前     | HONITSU-C
+*36 | 清一色         | CHINITSU
+*37 | 清一色門前     | CHINITSU-C
+
+# --- limit labels: shown on every big hand --------------------------------
+*61 | 満貫           | MANGAN
+*60 | 跳満           | HANEMAN
+*59 | 倍満           | BAIMAN
+*58 | 三倍満         | SANBAIMAN
+*57 | 役満           | YAKUMAN
+
+# --- yakuman: rare, but the payoff for a playtest -------------------------
+*47 | 国士無双       | KOKUSHI
+*52 | 大三元         | DAISANGEN
+*41 | 四暗刻         | SUUANKOU
+*45 | 九蓮宝燈       | CHUUREN
+*40 | 字一色         | TSUIISOU
+*51 | 緑一色         | RYUUIISO
+*44 | 大四喜         | DAISUUSHI
+*43 | 小四喜         | SHOSUUSHI
+*54 | 四槓子         | SUUKANTSU
+*53 | 清老頭         | CHINROU
+*49 | 天和           | TENHOU
+*50 | 地和           | CHIIHOU
+
+# --- everything else ------------------------------------------------------
+7   | 海底撈月       | HAITEI
+8   | 河底撈魚       | HOUTEI
+9   | 嶺上開花       | RINSHAN
+10  | 搶槓           | CHANKAN
+20  | 一色三順       | ISSHOKU
+21  | 一色三順門前   | ISSHOKU-C
+24  | 二盃口         | RYANPEIKO
+25  | 三色同刻       | SANDOUKOU
+26  | 三暗刻         | SANANKOU
+27  | 三槓子         | SANKANTSU
+28  | 小三元         | SHOSANGEN
+33  | 純全帯么       | JUNCHAN
+34  | 純全帯么門前   | JUNCHAN-C
+35  | 混老頭         | HONROU
+38  | 十三不塔       | JUUSAN
+39  | 人和           | RENHOU
+42  | 四暗刻         | SUUANKOU
+46  | 純正九蓮宝燈   | CHUUREN-9
+48  | 国士無双十三面 | KOKUSHI-13
+55  | 么九振切       | KYUUSHU
+56  | 九種倒牌       | ABORT

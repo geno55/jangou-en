@@ -1,0 +1,11 @@
+# The ROM. Never commit it and never distribute it - the BPS patch is the
+# deliverable, and it carries a CRC of the source so it only applies to the
+# correct dump. Put your own copy in the repo root as "Jangou (Japan).nes".
+*.nes
+
+# Build output - regenerate with tools/build.py
+build/
+
+# Python
+__pycache__/
+*.py[cod]

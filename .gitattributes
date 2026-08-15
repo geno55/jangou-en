@@ -1,0 +1,6 @@
+* text=auto eol=lf
+
+*.png binary
+*.bps binary
+*.ips binary
+*.nes binary

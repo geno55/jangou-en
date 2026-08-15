@@ -1,0 +1,91 @@
+﻿bank,table,cpu_addr,prg_offset,index,length,japanese,bytes
+04,scoring,$9E18,$11E18,0,5,ダブル立直,78 79 7a 26 47
+04,scoring,$9E1E,$11E1E,1,2,立直,26 47
+04,scoring,$9E21,$11E21,2,4,立直一発,26 47 01 60
+04,scoring,$9E26,$11E26,3,5,門前清摸和,34 35 31 3c 28
+04,scoring,$9E2C,$11E2C,4,3,断么九,48 36 09
+04,scoring,$9E30,$11E30,5,2,平和,27 28
+04,scoring,$9E33,$11E33,6,3,一盃口,01 49 1d
+04,scoring,$9E37,$11E37,7,4,海底撈月,2d 4b 2e 30
+04,scoring,$9E3C,$11E3C,8,4,河底撈魚,2f 4b 2e 4c
+04,scoring,$9E41,$11E41,9,4,嶺上開花,4a 1c 2b 2c
+04,scoring,$9E46,$11E46,10,2,搶槓,29 2a
+04,scoring,$9E49,$11E49,11,1,白,6f
+04,scoring,$9E4B,$11E4B,12,1,發,70
+04,scoring,$9E4D,$11E4D,13,1,中,71
+04,scoring,$9E4F,$11E4F,14,2,場風,75 5a
+04,scoring,$9E52,$11E52,15,2,自風,5f 5a
+04,scoring,$9E55,$11E55,16,3,全帯么,6d 4d 36
+04,scoring,$9E59,$11E59,17,5,全帯么門前,6d 4d 36 34 35
+04,scoring,$9E5F,$11E5F,18,4,三色同順,03 4e 37 6e
+04,scoring,$9E64,$11E64,19,6,三色同順門前,03 4e 37 6e 34 35
+04,scoring,$9E6B,$11E6B,20,4,一色三順,01 4e 03 6e
+04,scoring,$9E70,$11E70,21,6,一色三順門前,01 4e 03 6e 34 35
+04,scoring,$9E77,$11E77,22,4,一気通貫,01 44 45 46
+04,scoring,$9E7C,$11E7C,23,6,一気通貫門前,01 44 45 46 34 35
+04,scoring,$9E83,$11E83,24,3,二盃口,02 49 1d
+04,scoring,$9E87,$11E87,25,4,三色同刻,03 4e 37 22
+04,scoring,$9E8C,$11E8C,26,3,三暗刻,03 21 22
+04,scoring,$9E90,$11E90,27,3,三槓子,03 2a 1a
+04,scoring,$9E94,$11E94,28,3,小三元,39 03 25
+04,scoring,$9E98,$11E98,29,3,対々和,1f 20 28
+04,scoring,$9E9C,$11E9C,30,3,七対子,07 1f 1a
+04,scoring,$9EA0,$11EA0,31,3,混一色,32 01 4e
+04,scoring,$9EA4,$11EA4,32,5,混一色門前,32 01 4e 34 35
+04,scoring,$9EAA,$11EAA,33,4,純全帯么,33 6d 4d 36
+04,scoring,$9EAF,$11EAF,34,6,純全帯么門前,33 6d 4d 36 34 35
+04,scoring,$9EB6,$11EB6,35,3,混老頭,32 23 24
+04,scoring,$9EBA,$11EBA,36,3,清一色,31 01 4e
+04,scoring,$9EBE,$11EBE,37,5,清一色門前,31 01 4e 34 35
+04,scoring,$9EC4,$11EC4,38,4,十三不塔,0a 03 42 62
+04,scoring,$9EC9,$11EC9,39,2,人和,3f 28
+04,scoring,$9ECC,$11ECC,40,3,字一色,6a 01 4e
+04,scoring,$9ED0,$11ED0,41,3,四暗刻,04 21 22
+04,scoring,$9ED4,$11ED4,42,3,四暗刻,04 21 22
+04,scoring,$9ED8,$11ED8,43,3,小四喜,39 04 69
+04,scoring,$9EDC,$11EDC,44,3,大四喜,38 04 69
+04,scoring,$9EE0,$11EE0,45,4,九蓮宝燈,09 63 64 65
+04,scoring,$9EE5,$11EE5,46,6,□□九蓮宝燈,66 67 09 63 64 65
+04,scoring,$9EEC,$11EEC,47,4,国士無双,15 16 17 18
+04,scoring,$9EF1,$11EF1,48,7,国士無双十三面,15 16 17 18 0a 03 54
+04,scoring,$9EF9,$11EF9,49,2,天和,43 28
+04,scoring,$9EFC,$11EFC,50,2,地和,68 28
+04,scoring,$9EFF,$11EFF,51,3,緑一色,19 01 4e
+04,scoring,$9F03,$11F03,52,3,大三元,38 03 25
+04,scoring,$9F07,$11F07,53,3,清老頭,31 23 24
+04,scoring,$9F0B,$11F0B,54,3,四槓子,04 2a 1a
+04,scoring,$9F0F,$11F0F,55,4,么九振切,36 09 40 41
+04,scoring,$9F14,$11F14,56,3,ドラ１,76 77 0b
+04,scoring,$9F18,$11F18,57,3,ドラ２,76 77 0c
+04,scoring,$9F1C,$11F1C,58,3,ドラ３,76 77 0d
+04,scoring,$9F20,$11F20,59,3,ドラ４,76 77 0e
+04,scoring,$9F24,$11F24,60,3,ドラ５,76 77 0f
+04,scoring,$9F28,$11F28,61,3,ドラ６,76 77 10
+04,scoring,$9F2C,$11F2C,62,3,ドラ７,76 77 11
+04,scoring,$9F30,$11F30,63,3,ドラ８,76 77 12
+04,scoring,$9F34,$11F34,64,3,ドラ９,76 77 13
+04,scoring,$9F38,$11F38,65,4,ドラ１０,76 77 0b 14
+04,scoring,$9F3D,$11F3D,66,4,ドラ１１,76 77 0b 0b
+04,scoring,$9F42,$11F42,67,4,ドラ１２,76 77 0b 0c
+04,scoring,$9F47,$11F47,68,4,ドラ１３,76 77 0b 0d
+04,scoring,$9F4C,$11F4C,69,4,ドラ１４,76 77 0b 0e
+04,scoring,$9F51,$11F51,70,4,ドラ１５,76 77 0b 0f
+04,scoring,$9F56,$11F56,71,4,ドラ１６,76 77 0b 10
+04,scoring,$9F5B,$11F5B,72,4,ドラ１７,76 77 0b 11
+04,scoring,$9F60,$11F60,73,4,ドラ１８,76 77 0b 12
+04,scoring,$9F65,$11F65,74,2,役満,5c 3b
+04,scoring,$9F68,$11F68,75,3,三倍満,03 5d 3b
+04,scoring,$9F6C,$11F6C,76,2,倍満,5d 3b
+04,scoring,$9F6F,$11F6F,77,2,跳満,6b 3b
+04,scoring,$9F72,$11F72,78,2,満貫,3b 46
+04,scoring,$9F75,$11F75,79,4,九種倒牌,09 7b 7c 53
+05,records screen,$ABB8,$16BB8,0,1,中,71
+05,records screen,$ABBA,$16BBA,1,2,摸和,3c 28
+05,records screen,$ABBD,$16BBD,2,2,栄和,50 28
+05,records screen,$ABC0,$16BC0,3,2,放銃,7e 7f
+05,records screen,$ABC3,$16BC3,4,2,聴牌,51 53
+05,records screen,$ABC6,$16BC6,5,2,不聴,42 51
+05,records screen,$ABC9,$16BC9,6,2,立直,26 47
+05,records screen,$ABCC,$16BCC,7,2,副落,80 81
+05,records screen,$ABCF,$16BCF,8,3,ドラ数,76 77 82
+05,records screen,$ABD3,$16BD3,9,3,白發中,6f 70 71
